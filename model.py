@@ -18,7 +18,7 @@ class InputEmbeddings(nn.Module):
 
 class PositionalEncoding(nn.Module):
     
-    def __init__(self, d_model: int, dropout: float, max_len: int) -> None:
+    def __init__(self, d_model: int,  max_len: int, dropout: float) -> None:
         super().__init__()
         self.d_model = d_model
         self.max_len = max_len
@@ -27,7 +27,7 @@ class PositionalEncoding(nn.Module):
         # Positional encoding as seen in 3.5
         # Create matrix of shape (max_len, d_model)
         pe = torch.zeros(max_len, d_model) 
-        # vector of shape (max_len, 1)
+        # vector of shape (max_len, 1) 
         position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1) 
         div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-math.log(10000.0) / d_model))
         # even indices
@@ -60,8 +60,8 @@ class FeedForwardBlock(nn.Module):
 
     def __init__(self, d_model: int, d_ff: int, dropout: float) -> None:
         super().__init__()
-        self.dropout = nn.Dropout(dropout) # W1 & B1
-        self.linear_1 = nn.Linear(d_model, d_ff)
+        self.linear_1 = nn.Linear(d_model, d_ff) # W1 & B1
+        self.dropout = nn.Dropout(dropout) 
         self.linear_2 = nn.Linear(d_ff, d_model)  # W2 & B2
 
     def forward(self, x):
@@ -107,7 +107,8 @@ class MultiHeadAttentionBlock(nn.Module):
         key = key.view(key.shape[0], key.shape[1], self.h, self.d_k).transpose(1, 2)
         value = value.view(value.shape[0], value.shape[1], self.h, self.d_k).transpose(1, 2)
 
-        x, self.attention_scores = MultiHeadAttentionBlock.attention(query, key, value, self.dropout)
+        # Calculate attention
+        x, self.attention_scores = MultiHeadAttentionBlock.attention(query, key, value, mask, self.dropout)
 
         # (Batch, h, max_len, d_k) --> (Batch, max_len, h, d_k) --> (Batch, max_len, d_model)
         x = x.transpose(1, 2).contiguous().view(x.shape[0], -1, self.h* self.d_k)
@@ -181,7 +182,7 @@ class ProjectionLayer(nn.Module):
 
     def __init__(self, d_model: int, vocab_size: int) -> None:
         super().__init__()
-        self.linear = nn.Linear(d_model, vocab_size)
+        self.proj = nn.Linear(d_model, vocab_size)
 
     def forward(self, x):
         # (Batch, max_len, d_model) --> (Batch, max_len, vocab_size)
@@ -218,8 +219,8 @@ def build_transformer(src_vocab_size: int, tgt_vocab_size: int, src_seq_len: int
     tgt_embed = InputEmbeddings(d_model, tgt_vocab_size)
 
     # Create positional encoding layers
-    src_pos = PositionalEncoding(d_model, dropout, src_seq_len, dropout)
-    tgt_pos = PositionalEncoding(d_model, dropout, tgt_seq_len, dropout)
+    src_pos = PositionalEncoding(d_model, src_seq_len, dropout)
+    tgt_pos = PositionalEncoding(d_model, tgt_seq_len, dropout)
 
     # Create the encoder blocks
     encoder_blocks = []
