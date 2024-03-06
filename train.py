@@ -5,7 +5,7 @@ from torch.utils.data import random_split, DataLoader, Dataset
 from dataset import BilingualDataset, causal_mask
 from model import build_transformer
 
-from config import get_weights_file_path, get_config
+from config import get_weights_file_path, get_config, latest_weights_file_path
 
 from datasets import load_dataset
 from tokenizers import Tokenizer
@@ -136,7 +136,8 @@ def train_model(config):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f'Using device {device}')
 
-    Path(config['model_folder']).mkdir(parents=True, exist_ok=True)
+    # Make sure the weights folder exists
+    Path(f"{config['datasource']}_{config['model_folder']}").mkdir(parents=True, exist_ok=True)
 
     train_dataloader, val_dataloader, tokenizer_src, tokenizer_tgt = get_dataset(config)
     model = get_model(config, tokenizer_src.get_vocab_size(), tokenizer_tgt.get_vocab_size()).to(device)
@@ -147,13 +148,18 @@ def train_model(config):
 
     initial_epoch = 0
     global_step = 0
-    if config['preload']:
-        model_filename = get_weights_file_path(config, config['preload'])
+    preload = config['preload']
+    model_filename = latest_weights_file_path(config) if preload == 'latest' else get_weights_file_path(config, preload) if preload else None
+    print(f'model_filename: {model_filename}')
+    if model_filename:
         print(f'Preloading model {model_filename}')
         state = torch.load(model_filename)
+        model.load_state_dict(state['model_state_dict'])
         initial_epoch = state['epoch'] + 1
         optimizer.load_state_dict(state['optimizer_state_dict'])
         global_step = state['global_step']
+    else: 
+        print('No preloaded model')
 
     loss_fn = nn.CrossEntropyLoss(ignore_index=tokenizer_src.token_to_id('[PAD]'), label_smoothing=0.1).to(device)
 
